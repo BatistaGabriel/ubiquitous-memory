@@ -1,0 +1,55 @@
+version: "3.8"
+
+services:
+  db:
+    image: docker.io/library/mysql:8.0
+    container_name: db
+    restart: unless-stopped
+    tty: true
+    volumes:
+      - ./db:/docker-entrypoint-initdb.d
+      - mysql_data:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=nodedb
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_USER=node
+      - MYSQL_PASSWORD=node
+    healthcheck:
+      test:
+        ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "node", "-pnode"]
+      interval: 5s
+      timeout: 10s
+      retries: 3
+
+  app:
+    build: ./app
+    container_name: app
+    restart: unless-stopped
+    tty: true
+    volumes:
+      - ./app:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  nginx:
+    image: docker.io/library/nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
